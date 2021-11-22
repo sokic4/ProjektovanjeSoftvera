@@ -1,0 +1,367 @@
+KONTROLER
+
+private static Kontroler instance;
+Storage str;
+    dbBroker db;
+
+    private Kontroler() {
+       db= new DBBroker();
+       listaKOrisnika= dajListuKOrisnika();
+       str=new Storage();
+      OVO SU NEKI PRIMJERI KOJE MOZES PISATI 
+    }
+
+    public static Kontroler getInstance() {
+        if(instance == null){
+            instance= new Kontroler();
+        }
+        return instance;
+    }
+    
+        public List<Proizvod> vratiSveProizvode(){
+        return str.vratiListuProizvoda();
+    }
+    public List<Proizvodjac> vratiSveProizvodjace(){
+        return str.vratiListuProizvodjaca();
+    }
+    public List<PoreskaStopa> vratiSvePoreskeStope(){
+        return str.vratiListuPoreskihStopa();
+    }
+   
+    public List<Profesor> vratiSveProfesore(){
+        return db.vratiSveProfesore();
+    }
+    
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    DBBROKER
+    
+    
+    private static Connection konekcija;
+    public dbBroker() {
+        
+    }
+    
+    public void uspostaviKonekciju() throws SQLException{
+        if(konekcija==null || konekcija.isClosed()){
+        try {
+            String url="jdbc:mysql://localhost:3306/blazo";
+            String user="root";
+            String password="";
+            konekcija=DriverManager.getConnection(url,user,password);
+            konekcija.setAutoCommit(false);
+            
+        } catch (SQLException ex) {
+            Logger.getLogger(dbBroker.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        }
+        
+    }
+    
+    public void zaustaviKonekciju() throws SQLException{
+        if(konekcija!=null){
+            konekcija.close();
+        }
+        
+    }
+    
+        private void commit() {
+        try {
+            konekcija.commit();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void rollback() {
+        try {
+            konekcija.rollback();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+    
+    ISPOD PISES FUNCKIJE KOJE TI TREBAJU U DBBROKERU
+    public ArrayList<Korisnik> dajListuKOrisnika() throws SQLException {
+        ArrayList<Korisnik> lista = new ArrayList<>();
+        String upit = "select * from korisnik";
+        Statement s = konekcija.createStatement();
+        ResultSet rs= s.executeQuery(upit);
+        
+        while(rs.next()){
+            ArrayList<Projekat> rukovodi= dajListuProjekataR(rs.getString("email"));
+            ArrayList<Projekat> ucestvuje = dajListuProjekataK(rs.getString("email"));
+            lista.add(new Korisnik(rs.getString("email"), rs.getString("password"), rs.getString("imePrezime"),rukovodi,ucestvuje));
+            
+        }
+    return lista;
+    }
+
+    public ArrayList<Projekat> dajListuProjekataR(String email) throws SQLException {
+        ArrayList<Projekat> lista = new ArrayList<>();
+         String upit = "SELECT * FROM projekat p INNER JOIN angazovanje a ON p.sifraP=a.sifraP WHERE a.email LIKE '"+email+
+                 "' and a.rukovodilac like 'da' ";
+         Statement statement=konekcija.createStatement();
+            ResultSet rs=statement.executeQuery(upit);
+            
+            while(rs.next()){
+                int sifra = rs.getInt("sifraP");
+                String naziv = rs.getString("nazivP");
+                Date datumP= new Date(rs.getDate("datumP").getTime());
+                Date datumZ= new Date(rs.getDate("datumZ").getTime());
+                String status1 = rs.getString("status");
+                Status status= Status.valueOf(status1);
+                lista.add(new Projekat(sifra, naziv, datumP, datumZ, status));
+                
+            }
+    
+    return lista;
+    }
+
+    public ArrayList<Projekat> dajListuProjekataK(String email) throws SQLException {
+              ArrayList<Projekat> lista = new ArrayList<>();
+         String upit = "SELECT * FROM projekat p INNER JOIN angazovanje a ON p.sifraP=a.sifraP WHERE a.email LIKE '"+email+"' and a.rukovodilac like 'ne' ";
+         Statement statement=konekcija.createStatement();
+            ResultSet rs=statement.executeQuery(upit);
+             
+            while(rs.next()){
+                int sifra = rs.getInt("sifraP");
+                String naziv = rs.getString("nazivP");
+                Date datumP= new Date(rs.getDate("datumP").getTime());
+                Date datumZ= new Date(rs.getDate("datumZ").getTime());
+                String status1 = rs.getString("status");
+                Status status= Status.valueOf(status1);
+                lista.add(new Projekat(sifra, naziv, datumP, datumZ, status));
+                
+            }
+    
+    return lista;
+    }
+
+    public ArrayList<Angazovanje> dajListuAngazovanja(int sifra) throws SQLException {
+       ArrayList<Angazovanje> lista= new ArrayList<>();
+        
+        String upit= "select * from angazovanje a inner join projekat p on a.sifraP=p.sifraP inner join korisnik k on a.email like k.email where p.sifraP="+sifra;
+       Statement statement=konekcija.createStatement();
+            ResultSet rs=statement.executeQuery(upit);
+            while (rs.next()){
+                int sifraP = rs.getInt("sifraP");
+                String nazivP= rs.getString("nazivP");
+                Date datumP = new Date(rs.getDate("datumP").getTime());
+                Date datumZ = new Date(rs.getDate("datumZ").getTime());
+                String statusString = rs.getString("status");
+                Status status = Status.valueOf(statusString);
+                Projekat p = new Projekat(sifraP, nazivP, datumP, datumZ, status);
+                
+                String email =rs.getString("email");
+                String password =rs.getString("password");
+                String imePrezime =rs.getString("imePrezime");
+                ArrayList<Projekat> rukovodilac= dajListuProjekataR(email);
+                ArrayList<Projekat> ucesnik= dajListuProjekataK(email);
+             Korisnik k = new Korisnik(email, password, imePrezime, rukovodilac, ucesnik);
+             
+             String r= rs.getString("rukovodilac");
+             
+             
+               lista.add(new Angazovanje(k, p, r));
+                
+                
+                
+                
+    
+    }
+            return lista;
+    }
+
+    public void dodajAngazman(Angazovanje a) throws SQLException {
+        
+    String upit = "insert into angazovanje (sifraP,email,rukovodilac) values (?,?,?)";
+    PreparedStatement ps = konekcija.prepareStatement(upit);
+    ps.setInt(1, a.getProjekat().getSifraP());
+    ps.setString(2, a.getKorisnik().getEmail());
+    ps.setString(3, a.getRukovodilac());
+    ps.executeUpdate();
+    
+    }
+
+    public void obrisiAngazovanje(Angazovanje a) throws SQLException {
+        String upit = "delete from angazovanje where sifraP=? and email like '"+a.getKorisnik().getEmail()+"'";
+    PreparedStatement ps = konekcija.prepareStatement(upit);
+    ps.setInt(1, a.getProjekat().getSifraP());
+    ps.executeUpdate();
+    
+    }
+
+    public void promeniSifru(String stara, String nova, String email) throws SQLException {
+       
+    String upit = "update korisnik set password=? where email like '"+email+"' and password like '"+stara+"'";
+      PreparedStatement ps = konekcija.prepareStatement(upit);
+    ps.setString(1, nova);
+    
+    ps.executeUpdate();
+    }
+    
+    -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    TABELAAAAA
+    
+   private List<Profesor> listaProfesora;
+    private String []kolone=new String[]{"ime","prezime","zvanje","status"};
+    
+    public TableZadatak2(){
+        listaProfesora=Controller.getInstance().vratiSveProfesore();
+    }
+    
+    @Override
+    public int getRowCount() {
+        return listaProfesora.size();
+    }
+
+    @Override
+    public int getColumnCount() {
+        return kolone.length;
+    }
+
+    @Override
+    public Object getValueAt(int i, int i1) {
+        Profesor profesor=listaProfesora.get(i);
+        switch(i1){
+            case 0:
+                return profesor.getSifra();
+            case 1:
+                return profesor.getNaziv();
+            case 2:
+                return profesor.getZvanje();
+            case 3:
+                return profesor.getStatus();
+            default:
+                return null;
+        }
+    }
+      @Override
+    public String getColumnName(int i) {
+        return kolone[i];
+    }
+
+    @Override
+    public boolean isCellEditable(int i, int i1) {
+        Profesor profesor=listaProfesora.get(i);
+        if(i>=0 && i<=2 && profesor.getStatus().equals(Status.aktivan))
+            return true;
+        return false;
+    }
+    
+    PRIMJER KAD UNOSIMO TABELU PA STA STAVLJAMO KOD FORME
+            TableZadatak2 tableModel=new TableZadatak2();
+        tblProfesori.setModel(tableModel);
+        
+        JComboBox<Object> cmbZvanja=new JComboBox<>();
+        cmbZvanja.removeAllItems();
+        cmbZvanja.addItem(Zvanje.docent);
+        cmbZvanja.addItem(Zvanje.RedovniProfesor);
+        cmbZvanja.addItem(Zvanje.vanredniProfesor);
+        
+        JComboBox<Object> cmbStatus=new JComboBox<>();
+        cmbStatus.removeAllItems();
+        cmbStatus.addItem(Status.aktivan);
+        cmbStatus.addItem(Status.penzionisan);
+        
+        TableColumn kolonaZvanja=tblProfesori.getColumnModel().getColumn(2);
+        TableColumn kolonaStatus=tblProfesori.getColumnModel().getColumn(3);
+        
+        kolonaZvanja.setCellEditor(new DefaultCellEditor(cmbZvanja));
+        kolonaStatus.setCellEditor(new DefaultCellEditor(cmbStatus));
+        
+        
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        Funkcija popuni COMBOBOX
+            List<Proizvod> proizvodi=Controller.getInstance().vratiSveProizvode();
+        for (Proizvod proizvod : proizvodi) {
+            cmboxProizvodi.addItem(proizvod);
+        }
+        List<Proizvodjac> proizvodjaci=Controller.getInstance().vratiSveProizvodjace();
+        for (Proizvodjac proizvodjac : proizvodjaci) {
+            cmbProizvodjaci.addItem(proizvodjac);
+        }
+        List<PoreskaStopa> poreskeStope=Controller.getInstance().vratiSvePoreskeStope();
+        for (PoreskaStopa poreskaStopa : poreskeStope) {
+            cmbPoreskaStopa.addItem(poreskaStopa);
+        }
+        
+       ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+       
+       Funkcija da izmjenis preko dugmeta primjer
+       
+       int novaSifra=Integer.parseInt(txtSifra.getText());
+        String noviNaziv=txtNaziv.getText();
+        double novaCena=Double.parseDouble(txtCena.getText());
+        
+        PoreskaStopa ps=(PoreskaStopa) cmbPoreskaStopa.getSelectedItem();
+        Proizvodjac pr=(Proizvodjac) cmbProizvodjaci.getSelectedItem();
+        
+        Proizvod izabrani=(Proizvod) cmboxProizvodi.getSelectedItem();
+        izabrani.setNaziv(noviNaziv);
+        izabrani.setCena(novaCena);
+        izabrani.setPr(pr);
+        izabrani.setPs(ps);
+        
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        Funkcija da prilikom izbora iz COMBOBOXA se pojave podaci u poljima (postavljas je kao osluskivac na cmbbox)
+           Proizvod p=(Proizvod) cmboxProizvodi.getSelectedItem();
+        int novaSifra=p.getSifra();
+        txtSifra.setText(Integer.toString(novaSifra));
+        txtNaziv.setText(p.getNaziv());
+        double cena=p.getCena();
+        txtCena.setText(Double.toString(cena));
+        
+        PoreskaStopa ps=p.getPs();
+        Proizvodjac pr=p.getPr();
+        
+        cmbProizvodjaci.setSelectedItem(pr);
+        cmbPoreskaStopa.setSelectedItem(ps);
+        
+        ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        Funkcija za dodavanje Angazmana u tabelu preko eventListenera
+        Projekat projekat = (Projekat) cmbRukovodi.getSelectedItem();
+Korisnik korisnik = (Korisnik) cmbKorisnik.getSelectedItem();
+int rukovodilac =3;
+
+ArrayList<Angazovanje> lista = Kontroler.getInstance().dajListAngazovanjaProjekta(projekat.getSifraP());
+int ucesnici = lista.size();
+if (ucesnici == 5){
+     JOptionPane.showMessageDialog(this, "Uneli ste 5 ucesnika");
+            return;
+}
+        for (Angazovanje angazovanje : lista) {
+            if(angazovanje.getRukovodilac().equals("da")){
+                rukovodilac--;
+            }
+            
+        }
+        if(rukovodilac==0){
+            JOptionPane.showMessageDialog(this, "Uneli ste 3 rukovodioca");
+            return;
+        }
+        for (Angazovanje angazovanje : lista) {
+            
+        }
+   
+String rukovodi= txtRukovodilac.getText();
+if (rukovodi.equals("da") || rukovodi.equals("ne")){
+    
+
+Angazovanje a = new Angazovanje(korisnik, projekat,rukovodi );
+Kontroler.getInstance().dodajAngazman(a);
+
+}else {
+    JOptionPane.showMessageDialog(this, "ili da ili ne");
+}
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+funkcija za brisanje iz tabele necega
+ int i = tabelaAngazovanja.getSelectedRow();
+
+ ModelTabeleAngazovanja mta = (ModelTabeleAngazovanja) tabelaAngazovanja.getModel();
+  Angazovanje a = mta.vratiAngazovanjeNaRedu(i);
+ Kontroler.getInstance().obrisiAngazovanje(a);
+        
+        
