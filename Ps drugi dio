@@ -296,4 +296,599 @@ MAIN
         
     }
     
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+COMMONLIB
+
+ ________________
+|                |
+| komunikacija   |
+|________________|
+
+Komunikacija
+
+public class Komunikacija {
+
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
+
+    public Komunikacija(Socket socket) throws IOException {
+        this.socket = socket;
+        out = new ObjectOutputStream(socket.getOutputStream());
+        out.reset();
+        in = new ObjectInputStream(socket.getInputStream());
+    }
+
+    public Object procitaj() throws IOException, ClassNotFoundException {
+        return in.readObject();
+    }
+
+    public void posalji(Object objekatZaSlanje) throws IOException {
+        out.writeObject(objekatZaSlanje);
+    }
+
+    public void prekiniKomunikaciju() {
+        try {
+            socket.close();
+        } catch (IOException ex) {
+            Logger.getLogger(Komunikacija.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}
+
+ ________________
+|                |
+|     model      |
+|________________|
+
+OVDE STAVLJAS KLASE KOJE TI TREBAJU, NPR KORISNIK SA SVIM PODACIMA NJEGOVIM.... PRIMJER
+
+public class Korisnik implements Serializable {
+    
+    private String ime;
+    private String prezime;
+    private String email;
+    private String sifra;
+
+    public Korisnik(String ime, String prezime, String email, String sifra) {
+        this.ime = ime;
+        this.prezime = prezime;
+        this.email = email;
+        this.sifra = sifra;
+    }
+
+    public String getIme() {
+        return ime;
+    }
+
+    public void setIme(String ime) {
+        this.ime = ime;
+    }
+
+    public String getPrezime() {
+        return prezime;
+    }
+
+    public void setPrezime(String prezime) {
+        this.prezime = prezime;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getSifra() {
+        return sifra;
+    }
+
+    public void setSifra(String sifra) {
+        this.sifra = sifra;
+    }
+
+    @Override
+    public String toString() {
+        return email + " - " + ime + " " + prezime;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Korisnik other = (Korisnik) obj;
+        if (!Objects.equals(this.email, other.email)) {
+            return false;
+        }
+        return true;
+    }
+    
+}
+
+ ________________
+|                |
+|    TRANSFER    |
+|________________|
+
+REQUEST
+
+public class Request implements Serializable {
+    
+    private Map<String, Object> map = new HashMap<>();
+    private Operacija operacija;
+
+    public Object getData(String key) {
+        return map.get(key);
+    }
+
+    public void putData(String key, Object data) {
+        map.put(key, data);
+    }
+
+    public Operacija getOperacija() {
+        return operacija;
+    }
+
+    public void setOperacija(Operacija operacija) {
+        this.operacija = operacija;
+    }
+    
+}
+
+RESPONSE
+
+public class Response implements Serializable {
+    
+    private Map<String, Object> map = new HashMap<>();
+    private Operacija operacija;
+    private String greska;
+
+    public Object getData(String key) {
+        return map.get(key);
+    }
+    
+    public void putData(String key, Object data) {
+        map.put(key, data);
+    }
+    
+    public Operacija getOperacija() {
+        return operacija;
+    }
+
+    public void setOperacija(Operacija operacija) {
+        this.operacija = operacija;
+    }
+
+    public String getGreska() {
+        return greska;
+    }
+
+    public void setGreska(String greska) {
+        this.greska = greska;
+    }
+    
+}
+
+OPERACIJE
+
+Primjerrrrr
+public enum Operacija {
+    
+    LOGIN,
+    NOVI_KLIJENT_SE_PRIJAVIO,
+    KLIJENT_SE_ODJAVIO,
+    POSALJI_PORUKU_SVIM_KORISNICIMA,
+    POSALJI_PORUKU_JEDNOM_KORISNIKU,
+    PRIKAZI_PORUKE
+    
+}
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CLIENT
+
+ ________________
+|                |
+|     form       |
+|________________|
+
+GLAVNAFORMA
+
+private Komunikacija komunikacija;
+    private Korisnik korisnik;
+    private NitZaCitanje nitZaCitanje;
+
+    private TableModelPoruke tableModelSvePorukePoslednje3 = new TableModelPoruke(true, false);
+    private TableModelPoruke tableModelSvePorukeOstalePoruke = new TableModelPoruke(false, false);
+
+    private TableModelPoruke tableModelPorukeOdredjenogKorisnikaPoslednje3 = new TableModelPoruke(true, true);
+    private TableModelPoruke tableModelPorukeOdredjenogKorisnikaOstalePoruke = new TableModelPoruke(false, true);
+
+    /**
+     * Creates new form GlavnaForma
+     */
+    public GlavnaForma(Komunikacija komunikacija, Korisnik korisnik, NitZaCitanje nitZaCitanje) {
+        initComponents();
+        this.komunikacija = komunikacija;
+        this.korisnik = korisnik;
+        this.nitZaCitanje = nitZaCitanje;
+        nitZaCitanje.setGlavnaForma(this);
+        txtImePrezime.setText(korisnik.getIme() + " " + korisnik.getPrezime());
+        txtEmail.setText(korisnik.getEmail());
+
+        tableModelSvePorukePoslednje3.setTableModelPorukeOstalePoruke(tableModelSvePorukeOstalePoruke);
+        tblPrikazSvihPorukaPoslednje3.setModel(tableModelSvePorukePoslednje3);
+        tblPrikazSvihPorukaOstalePoruke.setModel(tableModelSvePorukeOstalePoruke);
+
+        tableModelPorukeOdredjenogKorisnikaPoslednje3.setTableModelPorukeOstalePoruke(tableModelPorukeOdredjenogKorisnikaOstalePoruke);
+        tblPrikazPorukaOdredjenogKorisnikaPoslednje3.setModel(tableModelPorukeOdredjenogKorisnikaPoslednje3);
+        tblPrikazPorukaOdredjenogKorisnikaOstalePoruke.setModel(tableModelPorukeOdredjenogKorisnikaOstalePoruke);
+    }
+    
+       private void btnLogoutActionPerformed(java.awt.event.ActionEvent evt) {                                          
+        logout();
+    }  
+    
+    
+    private void btnPosaljiPorukuSvimKorisnicimaActionPerformed(java.awt.event.ActionEvent evt) {                                                                
+        String poruka = txtPorukaZaSveKorisnike.getText().trim();
+        if (poruka.isEmpty()) {
+            prikaziPoruku("Poruka ne moze biti prazna");
+            return;
+        }
+        if (poruka.length() > 200) {
+            prikaziPoruku("Poruka ne moze sadrzati vise od 200 karaktera");
+            return;
+        }
+
+        Request request = new Request();
+        request.setOperacija(Operacija.POSALJI_PORUKU_SVIM_KORISNICIMA);
+        request.putData("poruka", poruka);
+        request.putData("odKorisnika", korisnik);
+        try {
+            komunikacija.posalji(request);
+            txtPorukaZaSveKorisnike.setText("");
+        } catch (IOException ex) {
+            Logger.getLogger(GlavnaForma.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    } 
+    
+    
+    private void btnPosaljiPorukuJednomKorisnikuActionPerformed(java.awt.event.ActionEvent evt) {                                                                
+        String poruka = txtPorukaZaJednogKorisnika.getText().trim();
+        if (poruka.isEmpty()) {
+            prikaziPoruku("Poruka ne moze biti prazna");
+            return;
+        }
+        if (poruka.length() > 200) {
+            prikaziPoruku("Poruka ne moze sadrzati vise od 200 karaktera");
+            return;
+        }
+
+        Request request = new Request();
+        request.setOperacija(Operacija.POSALJI_PORUKU_JEDNOM_KORISNIKU);
+        request.putData("odKorisnika", korisnik);
+        request.putData("kaKorisniku", (Korisnik) cmbPrijavljeniKorisnici.getSelectedItem());
+        request.putData("poruka", poruka);
+        try {
+            komunikacija.posalji(request);
+            txtPorukaZaJednogKorisnika.setText("");
+        } catch (IOException ex) {
+            Logger.getLogger(GlavnaForma.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    
+     private void tblPrikazSvihPorukaPoslednje3MouseClicked(java.awt.event.MouseEvent evt) {                                                           
+        int rowIndex = tblPrikazSvihPorukaPoslednje3.getSelectedRow();
+        Poruka poruka = tableModelSvePorukePoslednje3.getPoruka(rowIndex);
+        JOptionPane.showMessageDialog(null, poruka.getPoruka());
+    }      
+    
+     private void tblPrikazSvihPorukaOstalePorukeMouseClicked(java.awt.event.MouseEvent evt) {                                                             
+        int rowIndex = tblPrikazSvihPorukaOstalePoruke.getSelectedRow();
+        Poruka poruka = tableModelSvePorukeOstalePoruke.getPoruka(rowIndex);
+        JOptionPane.showMessageDialog(null, poruka.getPoruka());
+    }                                                            
+
+    private void btnPrikaziActionPerformed(java.awt.event.ActionEvent evt) {                                           
+        Request request = new Request();
+        request.setOperacija(Operacija.PRIKAZI_PORUKE);
+        request.putData("odKorisnika", (Korisnik) cmbPrijavljeniKorisnici1.getSelectedItem());
+        request.putData("kaKorisniku", korisnik);
+        try {
+            komunikacija.posalji(request);
+        } catch (IOException ex) {
+            Logger.getLogger(GlavnaForma.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }                                          
+
+    private void tblPrikazPorukaOdredjenogKorisnikaPoslednje3MouseClicked(java.awt.event.MouseEvent evt) {                                                                          
+        int rowIndex = tblPrikazPorukaOdredjenogKorisnikaPoslednje3.getSelectedRow();
+        Poruka poruka = tableModelPorukeOdredjenogKorisnikaPoslednje3.getPoruka(rowIndex);
+        JOptionPane.showMessageDialog(null, poruka.getPoruka());
+    }                                                                         
+
+    private void tblPrikazPorukaOdredjenogKorisnikaOstalePorukeMouseClicked(java.awt.event.MouseEvent evt) {                                                                            
+        int rowIndex = tblPrikazPorukaOdredjenogKorisnikaOstalePoruke.getSelectedRow();
+        Poruka poruka = tableModelPorukeOdredjenogKorisnikaOstalePoruke.getPoruka(rowIndex);
+        JOptionPane.showMessageDialog(null, poruka.getPoruka());
+    }                                                                           
+
+    public void logout() {
+        komunikacija.prekiniKomunikaciju();
+    }
+    
+     public void prikaziPoruku(String poruka) {
+        JOptionPane.showMessageDialog(null, poruka);
+    }
+
+    public void azurirajKorisnike(Response response) {
+        List<Korisnik> korisnici = (List<Korisnik>) response.getData("korisnici");
+        cmbPrijavljeniKorisnici.removeAllItems();
+        for (Korisnik k : korisnici) {
+            cmbPrijavljeniKorisnici.addItem(k);
+        }
+        cmbPrijavljeniKorisnici1.removeAllItems();
+        for (Korisnik k : korisnici) {
+            cmbPrijavljeniKorisnici1.addItem(k);
+        }
+    }
+
+    public void posaljiPorukuSvimKlijentima(Response response) {
+        Poruka poruka = (Poruka) response.getData("poruka");
+        tableModelSvePorukePoslednje3.addPoruka(poruka);
+    }
+
+    public void posaljiPorukuJednomKlijentu(Response response) {
+        Poruka poruka = (Poruka) response.getData("poruka");
+        tableModelSvePorukePoslednje3.addPoruka(poruka);
+    }
+
+    public void prikaziPoruke(Response response) {
+        List<Poruka> poruke = (List<Poruka>) response.getData("poruke");
+        for (Poruka poruka : poruke) {
+            tableModelPorukeOdredjenogKorisnikaPoslednje3.addPoruka(poruka);
+        }
+    }
+    
+    LOGINFORMA
+    
+     private Komunikacija komunikacija;
+    private NitZaCitanje nitZaCitanje;
+
+    /**
+     * Creates new form LoginForm
+     */
+    public LoginForm() {
+        initComponents();
+        podesiFormu(false);
+    }
+    
+     private void btnPoveziSeActionPerformed(java.awt.event.ActionEvent evt) {                                            
+        String email = txtEmail.getText().trim();
+        if (email.isEmpty()) {
+            prikaziPoruku("Morate uneti email");
+            return;
+        }
+        String sifra = new String(txtSifra.getPassword()).trim();
+        if (sifra.isEmpty()) {
+            prikaziPoruku("Morate uneti sifru");
+            return;
+        }
+
+        try {
+            Socket socket = new Socket("localhost", 9000);
+            komunikacija = new Komunikacija(socket);
+            nitZaCitanje = new NitZaCitanje(komunikacija, this);
+            nitZaCitanje.start();
+
+            Request request = new Request();
+            request.putData("email", email);
+            request.putData("sifra", sifra);
+            request.setOperacija(Operacija.LOGIN);
+            komunikacija.posalji(request);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage());
+        }
+    }                       
+    
+     public void prikaziPoruku(String poruka) {
+        JOptionPane.showMessageDialog(null, poruka);
+    }
+
+    private void podesiFormu(boolean povezanNaServer) {
+        if (povezanNaServer) {
+            btnPoveziSe.setEnabled(false);
+        } else {
+            btnPoveziSe.setEnabled(true);
+        }
+    }
+
+    public void logout() {
+        komunikacija.prekiniKomunikaciju();
+        podesiFormu(false);
+    }
+
+    public void login(Response response) {
+        if (response.getGreska() == null) {
+            Korisnik korisnik = (Korisnik) response.getData("korisnik");
+            GlavnaForma glavnaForma = new GlavnaForma(komunikacija, korisnik, nitZaCitanje);
+            glavnaForma.setLocationRelativeTo(null);
+            glavnaForma.setVisible(true);
+            dispose();
+        } else {
+            prikaziPoruku(response.getGreska());
+            komunikacija.prekiniKomunikaciju();
+        }
+    }
+    
+    TABLE MODEL PORUKE --- ovo je obicna klasa
+    
+     private List<Poruka> poruke = new ArrayList<>();
+    private String[] kolone = {"Od korisnika", "Za korisnika/Za sve", "Poruka"};
+    private String[] koloneSaVremenom = { "Od korisnika", "Za korisnika/Za sve", "Poruka", "Vreme" };
+    private TableModelPoruke tableModelOstalePoruke;
+    private boolean limitTo3;
+    private boolean showTime;
+
+    public TableModelPoruke(boolean limitTo3, boolean showTime) {
+        this.limitTo3 = limitTo3;
+        this.showTime = showTime;
+    }
+
+    @Override
+    public int getRowCount() {
+        return poruke.size();
+    }
+
+    @Override
+    public int getColumnCount() {
+        return showTime ? koloneSaVremenom.length : kolone.length;
+    }
+
+    @Override
+    public Object getValueAt(int rowIndex, int columnIndex) {
+        Poruka poruka = poruke.get(rowIndex);
+        switch (columnIndex) {
+            case 0:
+                return poruka.getOdKorisnika().getEmail();
+            case 1:
+                return poruka.getKaKorisniku() == null ? "Za sve" : poruka.getKaKorisniku().getEmail();
+            case 2:
+                return vratiSkracenuPoruku(poruka.getPoruka());
+            case 3:
+                return vratiVreme(poruka.getVreme());
+            default:
+                return "N/A";
+        }
+    }
+
+    @Override
+    public String getColumnName(int column) {
+        return showTime ? koloneSaVremenom[column] : kolone[column];
+    }
+
+    private String vratiSkracenuPoruku(String poruka) {
+        if (poruka.length() > 20) {
+            return poruka.substring(0, 20) + "...";
+        }
+        return poruka;
+    }
+
+    public void addPoruka(Poruka poruka) {
+        if (limitTo3 && poruke.size() == 3) {
+            Poruka najranijaPoruka = poruke.get(0);
+            poruke.remove(0);
+            tableModelOstalePoruke.addPoruka(najranijaPoruka);
+        }
+        poruke.add(poruka);
+        fireTableDataChanged();
+    }
+
+    public Poruka getPoruka(int rowIndex) {
+        return poruke.get(rowIndex);
+    }
+
+    public void setTableModelPorukeOstalePoruke(TableModelPoruke tableModelOstalePoruke) {
+        this.tableModelOstalePoruke = tableModelOstalePoruke;
+    }
+
+    private String vratiVreme(LocalDateTime vreme) {
+        return vreme.getHour() + ":" + vreme.getMinute() + ":" + vreme.getSecond();
+    }
+    
+    
+ ________________
+|                |
+|     main       |
+|________________|
+
+Main
+    
+     LoginForm loginForm = new LoginForm();
+        loginForm.setLocationRelativeTo(null);
+        loginForm.setVisible(true);
+
+ ________________
+|                |
+|     thread     |
+|________________|
+
+NitZaCitanje
+
+private Komunikacija komunikacija;
+    private LoginForm loginForm;
+    private GlavnaForma glavnaForma;
+
+    public NitZaCitanje(Komunikacija komunikacija, LoginForm loginForm) {
+        this.komunikacija = komunikacija;
+        this.loginForm = loginForm;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Response response = (Response) komunikacija.procitaj();
+                obradiOdgovor(response);
+            }
+        } catch (IOException ex) {
+            if (glavnaForma != null) {
+                glavnaForma.logout();
+                glavnaForma.dispose();
+                prikaziLoginFormu();
+            }
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(NitZaCitanje.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void obradiOdgovor(Response response) {
+        switch (response.getOperacija()) {
+            case LOGIN:
+                loginForm.login(response);
+                break;
+            case NOVI_KLIJENT_SE_PRIJAVIO:
+                glavnaForma.azurirajKorisnike(response);
+                break;
+            case KLIJENT_SE_ODJAVIO:
+                glavnaForma.azurirajKorisnike(response);
+                break;
+            case POSALJI_PORUKU_SVIM_KORISNICIMA:
+                glavnaForma.posaljiPorukuSvimKlijentima(response);
+                break;
+            case POSALJI_PORUKU_JEDNOM_KORISNIKU:
+                glavnaForma.posaljiPorukuJednomKlijentu(response);
+                break;
+            case PRIKAZI_PORUKE:
+                glavnaForma.prikaziPoruke(response);
+                break;
+            default:
+                JOptionPane.showMessageDialog(null, "Pogresna operacija");
+                break;
+        }
+    }
+
+    public void setGlavnaForma(GlavnaForma glavnaForma) {
+        this.glavnaForma = glavnaForma;
+    }
+
+    private void prikaziLoginFormu() {
+        LoginForm loginForm = new LoginForm();
+        loginForm.setLocationRelativeTo(null);
+        loginForm.setVisible(true);
+    }
+
+}
+
+
 
