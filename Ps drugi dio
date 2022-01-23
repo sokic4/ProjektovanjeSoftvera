@@ -1,1 +1,299 @@
+                                                                                SERVER
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ ________
+|        |
+| thread |
+|________|
+SERVER-NIT
+private ServerSocket serverSocket;
+    private ServerForm serverForm;
+    private List<KlijentNit> klijentNiti = new ArrayList<>();
+    private List<Poruka> svePoruke = new ArrayList<>();
+
+    public ServerNit(ServerForm serverForm) throws IOException {
+        serverSocket = new ServerSocket(9000);
+        this.serverForm = serverForm;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Socket socket = serverSocket.accept();
+                poveziKlijenta(socket);
+            }
+        } catch (IOException ex) {
+            System.out.println("Server zaustavljen");
+        }
+    }
+
+    private void poveziKlijenta(Socket socket) {
+        try {
+            KlijentNit klijentNit = new KlijentNit(socket, this);
+            klijentNiti.add(klijentNit);
+            klijentNit.start();
+        } catch (IOException ex) {
+            Logger.getLogger(ServerNit.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public void zaustaviServer() throws IOException {
+        for (KlijentNit klijentNit : klijentNiti) {
+            klijentNit.prekiniKomunikaciju();
+        }
+        serverSocket.close();
+    }
+
+    public synchronized void izbaciKlijentNit(KlijentNit klijentNit) {
+        klijentNiti.remove(klijentNit);
+        posaljiKorisnikeSvimKlijentima(Operacija.KLIJENT_SE_ODJAVIO);
+    }
+
+    public synchronized boolean jeKorisnikVecPrijavljen(String email, String sifra) {
+        for (KlijentNit klijentNit : klijentNiti) {
+            if (klijentNit.getKorisnik() != null
+                    && klijentNit.getKorisnik().getEmail().equals(email)
+                    && klijentNit.getKorisnik().getSifra().equals(sifra)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized void posaljiPorukuSvimKlijentima(Response response, String poruka, Korisnik odKorisnika) throws IOException {
+        Poruka porukaZaSlanje = new Poruka(odKorisnika, null, poruka, LocalDateTime.now());
+        svePoruke.add(porukaZaSlanje);
+        for (KlijentNit klijentNit : klijentNiti) {
+            response.setOperacija(Operacija.POSALJI_PORUKU_SVIM_KORISNICIMA);
+            response.putData("poruka", porukaZaSlanje);
+            klijentNit.getKomunikacija().posalji(response);
+        }
+    }
+
+    public synchronized void noviKlijentSePrijavio(KlijentNit noviKlijent) throws IOException {
+        posaljiKorisnikeSvimKlijentima(Operacija.NOVI_KLIJENT_SE_PRIJAVIO);
+    }
+
+    private void posaljiKorisnikeSvimKlijentima(Operacija operacija) {
+        List<Korisnik> korisnici = new ArrayList<>();
+        for (KlijentNit k : klijentNiti) {
+            korisnici.add(k.getKorisnik());
+        }
+        for (KlijentNit k : klijentNiti) {
+            Response response = new Response();
+            response.setOperacija(operacija);
+            response.putData("korisnici", korisnici);
+            try {
+                k.getKomunikacija().posalji(response);
+            } catch (IOException ex) {
+                Logger.getLogger(ServerNit.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    public synchronized void posaljiPorukuJednomKlijentu(Korisnik odKorisnika, Korisnik kaKorisniku, String poruka) throws IOException {
+        Poruka porukaZaSlanje = new Poruka(odKorisnika, null, poruka, LocalDateTime.now());
+        svePoruke.add(porukaZaSlanje);
+        for (KlijentNit k : klijentNiti) {
+            if (k.getKorisnik().equals(kaKorisniku)) {
+                Response response = new Response();
+                response.setOperacija(Operacija.POSALJI_PORUKU_JEDNOM_KORISNIKU);
+                response.putData("poruka", porukaZaSlanje);
+                k.getKomunikacija().posalji(response);
+                break;
+            }
+        }
+    }
+
+    public void prikaziPoruke(Korisnik odKorisnika, Korisnik kaKorisniku) {
+        List<Poruka> porukeZaSlanje = new ArrayList<>();
+        for (Poruka poruka : svePoruke) {
+            if (odKorisnika.equals(poruka.getOdKorisnika()) && (poruka.getKaKorisniku() == null || kaKorisniku.equals(poruka.getKaKorisniku()))) {
+                porukeZaSlanje.add(poruka);
+            }
+        }
+        for (KlijentNit k : klijentNiti) {
+            if (k.getKorisnik().equals(kaKorisniku)) {
+                Response response = new Response();
+                response.setOperacija(Operacija.PRIKAZI_PORUKE);
+                response.putData("poruke", porukeZaSlanje);
+                try {
+                    k.getKomunikacija().posalji(response);
+                } catch (IOException ex) {
+                    Logger.getLogger(ServerNit.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                break;
+            }
+        }
+    }
+
+}
+
+
+KLIJENT - NIT
+
+private Komunikacija komunikacija;
+    private ServerNit serverNit;
+    private Korisnik korisnik;
+
+    public KlijentNit(Socket socket, ServerNit serverNit) throws IOException {
+        komunikacija = new Komunikacija(socket);
+        this.serverNit = serverNit;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Request request = (Request) komunikacija.procitaj();
+                obradiZahtev(request);
+            }
+        } catch (IOException ex) {
+            prekiniKomunikaciju();
+            serverNit.izbaciKlijentNit(this);
+            String klijent = korisnik != null ? korisnik.getEmail() : "";
+            System.out.println("Klijent " + klijent + " se diskonektovao");
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(KlijentNit.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void obradiZahtev(Request request) throws IOException {
+        Response response = new Response();
+        switch (request.getOperacija()) {
+            case LOGIN:
+                login(request, response);
+                break;
+            case POSALJI_PORUKU_SVIM_KORISNICIMA:
+                posaljiPorukuSvimKorisnicima(request, response);
+                break;
+            case POSALJI_PORUKU_JEDNOM_KORISNIKU:
+                posaljiPorukuJednomKorisniku(request, response);
+                break;
+            case PRIKAZI_PORUKE:
+                prikaziPoruke(request, response);
+                break;
+            default:
+                response.setGreska("Pogresna operacija");
+                break;
+        }
+    }
+
+    public void prekiniKomunikaciju() {
+        komunikacija.prekiniKomunikaciju();
+    }
+
+    private void login(Request request, Response response) throws IOException {
+        String email = (String) request.getData("email");
+        String sifra = (String) request.getData("sifra");
+        if (serverNit.jeKorisnikVecPrijavljen(email, sifra)) {
+            response.setGreska("Korisnik je vec prijavljen");
+        } else {
+            korisnik = Repository.getInstance().login(email, sifra);
+            if (korisnik != null) {
+                response.putData("korisnik", korisnik);
+            } else {
+                response.setGreska("Invalid credentials");
+            }
+        }
+        response.setOperacija(Operacija.LOGIN);
+        komunikacija.posalji(response);
+        serverNit.noviKlijentSePrijavio(this);
+    }
+
+    private void posaljiPorukuSvimKorisnicima(Request request, Response response) throws IOException {
+        String poruka = (String) request.getData("poruka");
+        Korisnik odKorisnika = (Korisnik) request.getData("odKorisnika");
+        serverNit.posaljiPorukuSvimKlijentima(response, poruka, odKorisnika);
+    }
+
+    private void posaljiPorukuJednomKorisniku(Request request, Response response) {
+        Korisnik odKorisnika = (Korisnik) request.getData("odKorisnika");
+        Korisnik kaKorisniku = (Korisnik) request.getData("kaKorisniku");
+        String poruka = (String) request.getData("poruka");
+        try {
+            serverNit.posaljiPorukuJednomKlijentu(odKorisnika, kaKorisniku, poruka);
+        } catch (IOException ex) {
+            Logger.getLogger(KlijentNit.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public Korisnik getKorisnik() {
+        return korisnik;
+    }
+
+    public Komunikacija getKomunikacija() {
+        return komunikacija;
+    }
+
+    private void prikaziPoruke(Request request, Response response) {
+        Korisnik odKorisnika = (Korisnik) request.getData("odKorisnika");
+        Korisnik kaKorisniku = (Korisnik) request.getData("kaKorisniku");
+        serverNit.prikaziPoruke(odKorisnika, kaKorisniku);
+    }
+    
+}
+
+ ________
+|        |
+| form   |
+|________|
+
+SERVERFORMA
+
+   private ServerNit serverNit;
+
+   public ServerForm() {
+        initComponents();
+        podesiFormu(false);
+    }
+    
+       private void btnZaustaviServerActionPerformed(java.awt.event.ActionEvent evt) {                                                  
+        try {
+            serverNit.zaustaviServer();
+            podesiFormu(false);
+        } catch (IOException ex) {
+            prikaziPoruku("Greska u zaustavljanju servera: " + ex.getMessage());
+        }
+    }  
+    
+        private void btnPokreniServerActionPerformed(java.awt.event.ActionEvent evt) {                                                 
+        try {
+            serverNit = new ServerNit(this);
+            serverNit.start();
+            podesiFormu(true);
+        } catch (IOException ex) {
+            prikaziPoruku("Greska u pokretanju servera: " + ex.getMessage());
+        }
+    } 
+    
+        private void podesiFormu(boolean jeServerPokrenut) {
+        if (jeServerPokrenut) {
+            btnPokreniServer.setEnabled(false);
+            btnZaustaviServer.setEnabled(true);
+            txtStatus.setText("Server je pokrenut");
+        } else {
+            btnPokreniServer.setEnabled(true);
+            btnZaustaviServer.setEnabled(false);
+            txtStatus.setText("Server nije pokrenut");
+        }
+    }
+    public void prikaziPoruku(String poruka) {
+        JOptionPane.showMessageDialog(null, poruka);
+    }
+    
+ ________
+|        |
+| main   |
+|________|
+
+MAIN
+    public static void main(String[] args) {
+        
+        ServerForm serverForm = new ServerForm();
+        serverForm.setLocationRelativeTo(null);
+        serverForm.setVisible(true);
+        
+    }
+    
 
