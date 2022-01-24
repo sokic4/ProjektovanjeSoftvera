@@ -414,6 +414,55 @@ public class Korisnik implements Serializable {
     
 }
 
+PORUKA
+public class Poruka implements Serializable {
+ 
+    private Korisnik odKorisnika;
+    private Korisnik kaKorisniku;
+    private String poruka;
+    private LocalDateTime vreme;
+
+    public Poruka(Korisnik odKorisnika, Korisnik kaKorisniku, String poruka, LocalDateTime vreme) {
+        this.odKorisnika = odKorisnika;
+        this.kaKorisniku = kaKorisniku;
+        this.poruka = poruka;
+        this.vreme = vreme;
+    }
+
+    public Korisnik getOdKorisnika() {
+        return odKorisnika;
+    }
+
+    public void setOdKorisnika(Korisnik odKorisnika) {
+        this.odKorisnika = odKorisnika;
+    }
+
+    public Korisnik getKaKorisniku() {
+        return kaKorisniku;
+    }
+
+    public void setKaKorisniku(Korisnik kaKorisniku) {
+        this.kaKorisniku = kaKorisniku;
+    }
+
+    public String getPoruka() {
+        return poruka;
+    }
+
+    public void setPoruka(String poruka) {
+        this.poruka = poruka;
+    }
+
+    public LocalDateTime getVreme() {
+        return vreme;
+    }
+
+    public void setVreme(LocalDateTime vreme) {
+        this.vreme = vreme;
+    }
+    
+}
+
  ________________
 |                |
 |    TRANSFER    |
